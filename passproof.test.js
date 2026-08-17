@@ -265,4 +265,18 @@ describe("install", () => {
     assert.ok(JSON.stringify(claude.hooks.Stop).includes("passproof.js"));
     assert.ok(JSON.stringify(claude.hooks.PostToolUse).includes("passproof.js"));
   });
+
+  it("runs install when invoked via an npm bin symlink", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "passproof-"));
+    const shim = path.join(dir, "passproof");
+    fs.symlinkSync(bin, shim);
+    const r = spawnSync(process.execPath, [shim, "install"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.match(r.stdout, /installed:/);
+    assert.ok(fs.existsSync(path.join(dir, ".cursor/hooks.json")));
+    assert.ok(fs.existsSync(path.join(dir, ".claude/settings.json")));
+  });
 });

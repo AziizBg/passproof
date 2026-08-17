@@ -24,12 +24,6 @@ npx passproof install
 
 That copies one file into the repo and wires **Cursor** (`stop` + `afterShellExecution`) and **Claude Code** (`Stop` + `PostToolUse` on Bash). Chat is free. “Done” is free. “All tests passed” without pytest/jest/vitest/cargo/go output in that turn is not.
 
-Until this is on npm:
-
-```sh
-node passproof.js install
-```
-
 ```sh
 npx passproof install --global
 npx passproof uninstall

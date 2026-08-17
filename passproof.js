@@ -454,7 +454,14 @@ function main() {
   runHook();
 }
 
-const entry = process.argv[1] ? path.resolve(process.argv[1]) : "";
-if (entry && path.resolve(SELF) === entry) {
-  main();
+function isDirectRun() {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    return fs.realpathSync(SELF) === fs.realpathSync(argv1);
+  } catch {
+    return path.resolve(SELF) === path.resolve(argv1);
+  }
 }
+
+if (isDirectRun()) main();

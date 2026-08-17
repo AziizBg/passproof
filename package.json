@@ -1,6 +1,6 @@
 {
   "name": "passproof",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "If it says the tests passed, the runner output has to be in the same turn.",
   "type": "module",
   "bin": {

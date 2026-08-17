@@ -1,0 +1,38 @@
+{
+  "name": "passproof",
+  "version": "0.1.0",
+  "description": "If it says the tests passed, the runner output has to be in the same turn.",
+  "type": "module",
+  "bin": {
+    "passproof": "passproof.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node passproof.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "passproof.js",
+    "README.md",
+    "LICENSE",
+    "demo.gif"
+  ],
+  "keywords": [
+    "cursor",
+    "claude-code",
+    "hooks",
+    "verification"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AziizBg/passproof.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AziizBg/passproof/issues"
+  },
+  "homepage": "https://github.com/AziizBg/passproof#readme",
+  "author": "Ben Ghorbel Mohamed Aziz",
+  "license": "MIT"
+}

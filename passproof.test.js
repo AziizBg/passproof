@@ -180,6 +180,31 @@ describe("shell receipt", () => {
     });
     assert.equal(stop.action, "block");
   });
+
+  it("does not reuse a Claude Code receipt from an earlier prompt", () => {
+    const session_id = `test-prompt-${Date.now()}`;
+    handlePayload({
+      session_id,
+      prompt_id: "p1",
+      hook_event_name: "PostToolUse",
+      tool_name: "Bash",
+      tool_response: { stdout: "3 passed in 0.12s", stderr: "", interrupted: false },
+    });
+    const same = handlePayload({
+      session_id,
+      prompt_id: "p1",
+      hook_event_name: "Stop",
+      last_assistant_message: "All tests passed.",
+    });
+    assert.equal(same.action, "allow");
+    const next = handlePayload({
+      session_id,
+      prompt_id: "p2",
+      hook_event_name: "Stop",
+      last_assistant_message: "All tests passed.",
+    });
+    assert.equal(next.action, "block");
+  });
 });
 
 describe("hook I/O", () => {
@@ -264,6 +289,38 @@ describe("install", () => {
     assert.ok(JSON.stringify(cursor.hooks.afterShellExecution).includes("passproof.js"));
     assert.ok(JSON.stringify(claude.hooks.Stop).includes("passproof.js"));
     assert.ok(JSON.stringify(claude.hooks.PostToolUse).includes("passproof.js"));
+  });
+
+  it("writes repo-relative commands and replaces old entries on reinstall", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "passproof-"));
+    fs.mkdirSync(path.join(dir, ".cursor"));
+    fs.writeFileSync(
+      path.join(dir, ".cursor/hooks.json"),
+      JSON.stringify({
+        version: 1,
+        hooks: {
+          stop: [{ command: "./other.sh" }, { command: 'node "/old/abs/passproof.js"' }],
+        },
+      }),
+    );
+    for (let i = 0; i < 2; i++) {
+      const r = spawnSync(process.execPath, [bin, "install"], { cwd: dir, encoding: "utf8" });
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+    }
+    const cursor = JSON.parse(fs.readFileSync(path.join(dir, ".cursor/hooks.json"), "utf8"));
+    const claude = JSON.parse(fs.readFileSync(path.join(dir, ".claude/settings.json"), "utf8"));
+    assert.deepEqual(
+      cursor.hooks.stop.map((e) => e.command),
+      ["./other.sh", "node .cursor/hooks/passproof.js"],
+    );
+    assert.equal(cursor.hooks.afterShellExecution.length, 1);
+    assert.equal(claude.hooks.Stop.length, 1);
+    assert.equal(
+      claude.hooks.Stop[0].hooks[0].command,
+      'node "$CLAUDE_PROJECT_DIR/.claude/hooks/passproof.js"',
+    );
+    assert.ok(!JSON.stringify(cursor).includes(dir));
+    assert.ok(!JSON.stringify(claude).includes(dir));
   });
 
   it("runs install when invoked via an npm bin symlink", () => {

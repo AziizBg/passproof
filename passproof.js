@@ -158,6 +158,11 @@ export function sessionKey(payload) {
   return payload.conversation_id || payload.session_id || payload.generation_id || "default";
 }
 
+// One agent turn: Cursor sends generation_id, Claude Code sends prompt_id.
+export function turnId(payload) {
+  return payload.generation_id || payload.prompt_id || null;
+}
+
 export function receiptPath(payload) {
   return path.join(os.tmpdir(), "passproof", `${sessionKey(payload)}.json`);
 }
@@ -168,7 +173,7 @@ export function saveReceipt(payload, output) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const receipt = {
     conversation_id: sessionKey(payload),
-    generation_id: payload.generation_id || null,
+    turn_id: turnId(payload),
     output: String(output).slice(-8000),
     ts: Date.now(),
   };
@@ -182,13 +187,9 @@ export function loadReceipt(payload) {
   try {
     const receipt = JSON.parse(fs.readFileSync(file, "utf8"));
     if (Date.now() - Number(receipt.ts || 0) > RECEIPT_TTL_MS) return "";
-    if (
-      payload.generation_id &&
-      receipt.generation_id &&
-      payload.generation_id !== receipt.generation_id
-    ) {
-      return "";
-    }
+    const current = turnId(payload);
+    const saved = receipt.turn_id || receipt.generation_id || null;
+    if (current && saved && current !== saved) return "";
     return String(receipt.output || "");
   } catch {
     return "";
@@ -287,8 +288,16 @@ function parsePayload(raw) {
   }
 }
 
-function hookCommand(hookFile) {
-  return `node ${JSON.stringify(hookFile)}`;
+// Project installs use repo-relative paths so the config works for anyone who clones it.
+function hookCommand(hookFile, global, kind) {
+  if (global) return `node ${JSON.stringify(hookFile)}`;
+  if (kind === "cursor") return "node .cursor/hooks/passproof.js";
+  return 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/passproof.js"';
+}
+
+// Drop any older passproof entries so a reinstall refreshes the command.
+function withEntry(list, entry) {
+  return [...(list || []).filter((e) => !hasPassproof(e)), entry];
 }
 
 function readJson(file, fallback) {
@@ -337,17 +346,10 @@ function installClaude(global) {
   const file = claudeSettingsPath(global);
   const settings = readJson(file, {});
   settings.hooks = settings.hooks || {};
-  const command = hookCommand(hookFile);
+  const command = hookCommand(hookFile, global, "claude");
   const entry = { hooks: [{ type: "command", command, timeout: 10 }] };
-  if (!hasPassproof(settings.hooks.Stop)) {
-    settings.hooks.Stop = [...(settings.hooks.Stop || []), entry];
-  }
-  if (!hasPassproof(settings.hooks.PostToolUse)) {
-    settings.hooks.PostToolUse = [
-      ...(settings.hooks.PostToolUse || []),
-      { matcher: "Bash", ...entry },
-    ];
-  }
+  settings.hooks.Stop = withEntry(settings.hooks.Stop, entry);
+  settings.hooks.PostToolUse = withEntry(settings.hooks.PostToolUse, { matcher: "Bash", ...entry });
   writeJson(file, settings);
   return file;
 }
@@ -358,15 +360,12 @@ function installCursor(global) {
   const hooks = readJson(file, { version: 1, hooks: {} });
   hooks.version = hooks.version || 1;
   hooks.hooks = hooks.hooks || {};
-  const command = hookCommand(hookFile);
-  const stopEntry = { command, timeout: 10, loop_limit: MAX_LOOP };
-  const shellEntry = { command, timeout: 10 };
-  if (!hasPassproof(hooks.hooks.stop)) {
-    hooks.hooks.stop = [...(hooks.hooks.stop || []), stopEntry];
-  }
-  if (!hasPassproof(hooks.hooks.afterShellExecution)) {
-    hooks.hooks.afterShellExecution = [...(hooks.hooks.afterShellExecution || []), shellEntry];
-  }
+  const command = hookCommand(hookFile, global, "cursor");
+  hooks.hooks.stop = withEntry(hooks.hooks.stop, { command, timeout: 10, loop_limit: MAX_LOOP });
+  hooks.hooks.afterShellExecution = withEntry(hooks.hooks.afterShellExecution, {
+    command,
+    timeout: 10,
+  });
   writeJson(file, hooks);
   return file;
 }

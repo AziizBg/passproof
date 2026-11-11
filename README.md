@@ -6,17 +6,19 @@ Does not run your tests. Blocks the claim.
 
 Featured in [AI in QA #24](https://aiinqa.com/ai-in-qa-issue-24/).
 
-![passproof blocks a fake All tests passed, then allows it after real pytest output](demo.gif)
+![A real Claude Code run: the agent says All tests passed without running anything and passproof blocks it; after npm test prints, the claim is allowed](demo.gif)
 
 ```
-agent:  All tests passed.
-passproof:  blocked. no runner output in this turn.
+agent:      All tests passed. Ready to merge.
+passproof:  blocked. no test-runner output in this turn.
 
-$ pytest -q
-3 passed in 0.12s
-agent:  All tests passed.
+$ npm test
+ℹ tests 3  ℹ pass 3  ℹ fail 0
+agent:      The tests pass: 3 of 3, with 0 failures.
 passproof:  ok.
 ```
+
+The GIF is drawn from two real `claude -p` runs (lines verbatim, prompt shortened).
 
 ## Install
 

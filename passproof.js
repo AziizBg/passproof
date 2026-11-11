@@ -33,6 +33,21 @@ const CLAIM_RE = [
 const NOT_A_CLAIM_RE =
   /\b(will not say|won'?t say|cannot say|can'?t say|cannot claim|can'?t claim|do not (?:say|mention)|don'?t (?:say|mention)|from claiming|whether tests|you claimed the tests passed|no test-runner output|blocks an agent|did not run any tests|i will not say)\b/i;
 
+// A negation, condition, or modal before the claim means it is not a closeout:
+// "it would read as confirmation that the tests passed", "if all tests pass".
+const HEDGE_BEFORE_RE =
+  /\b(?:not|never|no longer|cannot|can'?t|won'?t|wouldn'?t|don'?t|didn'?t|haven'?t|hasn'?t|isn'?t|aren'?t|would|could|might|should|will|i'?ll|make sure|ensure|need to|if|unless|whether|until|claim\w*|assum\w*|pretend\w*)\b/i;
+
+function hedgedBeforeClaim(sentence) {
+  let first = -1;
+  for (const re of CLAIM_RE) {
+    const m = re.exec(sentence);
+    if (m && (first === -1 || m.index < first)) first = m.index;
+  }
+  if (first === -1) return false;
+  return HEDGE_BEFORE_RE.test(sentence.slice(0, first));
+}
+
 const RUNNER_OK_RE = [
   /\d+\s+passed(?:,\s*\d+\s+(?:failed|skipped|warnings?))*\s+in\s+\d/i,
   /={3,}.*\d+\s+passed/i,
@@ -66,7 +81,9 @@ export function claimsTestsPassed(text) {
     const trimmed = sentence.trim();
     if (!trimmed) continue;
     if (NOT_A_CLAIM_RE.test(trimmed)) continue;
-    if (CLAIM_RE.some((re) => re.test(trimmed))) return true;
+    if (!CLAIM_RE.some((re) => re.test(trimmed))) continue;
+    if (hedgedBeforeClaim(trimmed)) continue;
+    return true;
   }
   return false;
 }
@@ -118,7 +135,19 @@ export function isHumanPrompt(obj) {
   return false;
 }
 
-export function lastTurnText(records) {
+// Claude Code transcripts also hold bookkeeping records (api-request-blob,
+// attachment, queue-operation...) that replay the whole conversation, the
+// user's own prompt included. Only user/assistant messages belong to a turn.
+const CONVERSATION_TYPES = new Set(["user", "assistant", "human", "tool_result"]);
+
+export function isConversationRecord(obj) {
+  if (!obj || typeof obj !== "object") return false;
+  if (typeof obj.type === "string") return CONVERSATION_TYPES.has(obj.type);
+  return Boolean(obj.role || obj.message);
+}
+
+export function lastTurnText(allRecords) {
+  const records = allRecords.filter(isConversationRecord);
   if (!records.length) return "";
   let lastUser = -1;
   for (let i = 0; i < records.length; i++) {

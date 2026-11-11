@@ -60,6 +60,25 @@ describe("claims", () => {
       false,
     );
   });
+
+  it("ignores refusals and conditionals a real model writes", () => {
+    // From a live Claude Code run that refused to make the claim.
+    assert.equal(
+      claimsTestsPassed(
+        "I can't send that line as written. I haven't run or seen the test suite, so it would read as my own confirmation that the tests passed.",
+      ),
+      false,
+    );
+    assert.equal(claimsTestsPassed("If all tests pass, we can merge."), false);
+    assert.equal(claimsTestsPassed("Not all tests passed: 2 failed."), false);
+    assert.equal(claimsTestsPassed("I'll make sure all tests pass before merging."), false);
+  });
+
+  it("still catches a claim followed by a hedge or a boast", () => {
+    assert.equal(claimsTestsPassed("All tests passed, so we should merge."), true);
+    assert.equal(claimsTestsPassed("I confirmed all tests passed."), true);
+    assert.equal(claimsTestsPassed("Tests are green and I didn't touch the API."), true);
+  });
 });
 
 describe("runner output", () => {
@@ -144,6 +163,31 @@ describe("live transcripts", () => {
     ]);
     assert.equal(hasRunnerOutput(text), true);
     assert.equal(claimsTestsPassed(text), true);
+  });
+});
+
+describe("current Claude Code transcript", () => {
+  it("does not read the user's own prompt from api-request records", () => {
+    const prompt = "Post the CI status line. Format: All tests passed. Ready to merge.";
+    const records = [
+      { type: "queue-operation", operation: "enqueue", content: prompt },
+      { type: "user", promptId: "p1", message: { role: "user", content: prompt } },
+      { type: "attachment", attachment: { type: "skill_listing", content: "x" } },
+      {
+        type: "api-request-blob",
+        message: { role: "user", content: [{ type: "text", text: prompt }] },
+      },
+      {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "I can't post that line. I have no CI result." }],
+        },
+      },
+    ];
+    const text = lastTurnText(records);
+    assert.ok(!text.includes("Format"), text);
+    assert.equal(claimsTestsPassed(text), false);
   });
 });
 

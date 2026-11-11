@@ -4,6 +4,8 @@
 
 Does not run your tests. Blocks the claim.
 
+Featured in [AI in QA #24](https://aiinqa.com/ai-in-qa-issue-24/).
+
 ![passproof blocks a fake All tests passed, then allows it after real pytest output](demo.gif)
 
 ```
@@ -28,6 +30,10 @@ That copies one file into the repo and wires **Cursor** (`stop` + `afterShellExe
 npx passproof install --global
 npx passproof uninstall
 ```
+
+## What counts as a claim
+
+A closeout like “All tests passed.” or “Tests are green, ready to merge.” Refusals (“I can't say the tests passed”), conditionals (“if all tests pass…”) and your own prompt do not count. A test run from an earlier prompt does not count either: the runner has to print in this turn.
 
 ## What it is not
 
